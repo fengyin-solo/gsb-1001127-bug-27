@@ -12,6 +12,19 @@ ACTION_RULES = {"安排清淤": "淤积", "安排疏通": "堵塞", "登记损�
 NEGATIVE_ACTIONS = []
 
 
+def _attach_reconciliation(row: dict[str, Any]) -> dict[str, Any]:
+    """把告警对账台算出的根因/风险阶段回灌到排水列表与详情，两处口径保持一致。"""
+    # 延迟导入：对账服务依赖 store，避免模块初始化期的循环引用
+    from app.services.reconciliation import reconciliation
+
+    cause = reconciliation.root_cause_for_code(str(row.get("设施编号", "")))
+    if cause:
+        row = dict(row)
+        for key, value in cause.items():
+            row.setdefault(key, value)
+    return row
+
+
 class DrainageService:
     def list_entries(
         self,
@@ -28,10 +41,14 @@ class DrainageService:
             rows = [row for row in rows if row.get("status") == status]
         total = len(rows)
         start = max(page - 1, 0) * size
-        return rows[start:start + size], total
+        page_rows = [_attach_reconciliation(row) for row in rows[start:start + size]]
+        return page_rows, total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        row = store.find(MODULE, entry_id)
+        if row is None:
+            return None
+        return _attach_reconciliation(row)
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]

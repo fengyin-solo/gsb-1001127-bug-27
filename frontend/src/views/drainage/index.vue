@@ -31,12 +31,19 @@
       <thead>
         <tr>
           <th v-for="column in columns" :key="column">{{ column }}</th>
+          <th>风险阶段</th>
+          <th>根因（告警对账台回灌）</th>
           <th>可执行动作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td>
+            <span v-if="row['风险阶段']">{{ row['风险阶段'] }}·{{ row['可通行性'] }}</span>
+            <span v-else>—</span>
+          </td>
+          <td class="cause-cell">{{ row['根因'] ?? '—' }}</td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -50,7 +57,7 @@
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td :colspan="columns.length + 1" class="empty-state">暂无排水设施数据，可先登记排水设施</td>
+          <td :colspan="columns.length + 3" class="empty-state">暂无排水设施数据，可先登记排水设施</td>
         </tr>
       </tbody>
     </table>
@@ -128,3 +135,7 @@ async function reload() {
 
 onMounted(reload)
 </script>
+
+<style scoped>
+.cause-cell { max-width: 300px; color: #475467; }
+</style>

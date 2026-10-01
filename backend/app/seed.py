@@ -653,3 +653,109 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
   '存放地点': '养护材料样例3',
   '材料状态': '养护材料样例3'}]
 }
+
+# ---- 告警对账台种子 ------------------------------------------------------------
+# 初始态故意保留一处脏数据：河埠路 PS-001 泵站已有“离线”待处置告警，但风险面
+# v1 仍停留在离线前的“可通行”，处置通知与防汛事件还各自挂着不同水位阶段，
+# 正好用来验证对账台“重建后三源一致、离线即不可通行”。
+SEED_ROWS["road_section"].extend([
+    {'id': 101, 'status': '正常', 'pending': False, 'abnormal': False,
+     '路段编号': 'ROAD-0101', '路段名称': '河埠路',
+     '起止桩号': 'K3+200-K4+800', '道路等级': '次干路', '车道数': '4',
+     '路面类型': '沥青', '管养单位': '城东养护所', '路段状态': '正常'},
+    {'id': 102, 'status': '正常', 'pending': False, 'abnormal': False,
+     '路段编号': 'ROAD-0102', '路段名称': '滨江路',
+     '起止桩号': 'K0+000-K2+100', '道路等级': '主干路', '车道数': '6',
+     '路面类型': '沥青', '管养单位': '城东养护所', '路段状态': '正常'},
+])
+
+SEED_ROWS["drainage"].extend([
+    {'id': 101, 'status': '损坏', 'pending': True, 'abnormal': True,
+     '设施编号': 'DRAI-1001', '设施类型': '泵站', '所属路段': '河埠路',
+     '桩号位置': 'K4+020', '清理日期': '2026-09-20', '淤积程度': '离线',
+     '管养班组': '防汛三班', '设施状态': '泵站离线（待对账重建）'},
+    {'id': 102, 'status': '正常', 'pending': False, 'abnormal': False,
+     '设施编号': 'DRAI-1002', '设施类型': '雨水口', '所属路段': '滨江路',
+     '桩号位置': 'K1+350', '清理日期': '2026-09-25', '淤积程度': '无',
+     '管养班组': '防汛二班', '设施状态': '低水位·可通行'},
+])
+
+SEED_ROWS["flood"].extend([
+    {'id': 101, 'status': '响应中', 'pending': True, 'abnormal': True,
+     '记录编号': 'FLOO-1001', '预警级别': '橙色', '影响路段': '河埠路',
+     '积水深度': '高水位', '应急措施': '移动泵车增援', '投入人员': '12',
+     '恢复时间': '', '防汛状态': '响应中（三源阶段待对账）'},
+])
+
+SEED_ROWS["rec_facility"] = [
+    {'id': 1, 'version': 1, '设施编号': 'PS-001', 'drainage_code': 'DRAI-1001',
+     '设施类型': '泵站',
+     '所属路段': '河埠路', '桩号位置': 'K4+020', 'merged_from': [],
+     'updated_at': '2026-09-28 20:10:00'},
+    {'id': 2, 'version': 1, '设施编号': 'YSK-002', 'drainage_code': 'DRAI-1002',
+     '设施类型': '雨水口',
+     '所属路段': '滨江路', '桩号位置': 'K1+350', 'merged_from': [],
+     'updated_at': '2026-09-28 20:10:00'},
+]
+
+# 历史水位：采集时刻冻结，后续重算只引用、不回改
+SEED_ROWS["rec_reading"] = [
+    {'id': 1, 'facility_id': 1, 'collected_at': '2026-09-28 18:00:00',
+     'level_cm': 12.0, 'stage': '低水位', 'source': '自动采集', 'frozen': True},
+    {'id': 2, 'facility_id': 1, 'collected_at': '2026-09-28 19:00:00',
+     'level_cm': 21.5, 'stage': '中水位', 'source': '自动采集', 'frozen': True},
+    {'id': 3, 'facility_id': 1, 'collected_at': '2026-09-28 20:00:00',
+     'level_cm': 33.0, 'stage': '高水位', 'source': '自动采集', 'frozen': True},
+    {'id': 4, 'facility_id': 2, 'collected_at': '2026-09-28 20:00:00',
+     'level_cm': 9.0, 'stage': '低水位', 'source': '自动采集', 'frozen': True},
+]
+
+SEED_ROWS["rec_alarm"] = [
+    {'id': 1, 'facility_id': 1, 'alarm_type': '泵站离线', 'source': 'SCADA',
+     'alarm_time': '2026-09-28 20:05:00', 'stage': '高水位', 'status': '待处置',
+     'conclusion': None, 'root_cause': None, 'closed_by_reading_id': None,
+     'disposed_at': None},
+]
+
+# 处置通知与防汛事件的阶段故意和风险面不一致，制造“三源不同水位阶段”
+SEED_ROWS["rec_notice"] = [
+    {'id': 1, 'alarm_id': 1, 'facility_id': 1, 'stage': '中水位',
+     'passability': '可通行', 'notified_at': '2026-09-28 20:05:00',
+     'resolved': False},
+]
+
+SEED_ROWS["rec_flood_event"] = [
+    {'id': 1, 'alarm_id': 1, 'facility_id': 1, 'road': '河埠路',
+     'stage': '高水位', 'water_depth': '高水位', 'status': '待响应',
+     'event_time': '2026-09-28 20:05:00', 'closed_at': None},
+]
+
+# 脏风险面：离线告警已到，活动风险面却仍是离线前的可通行（待重建修正）
+SEED_ROWS["rec_surface"] = [
+    {'id': 1, 'facility_id': 1, 'road': '河埠路', 'version': 1,
+     'stage': '中水位', 'passability': '可通行', 'pump_offline': False,
+     'basis': '最近一次自动采集',
+     'root_cause': '离线前快照（待重建）：自动采集水位 21.5cm（中水位）',
+     'frozen_readings': [], 'active': True, 'superseded_by': None,
+     'trigger': '初始化', 'created_at': '2026-09-28 19:05:00'},
+    {'id': 2, 'facility_id': 2, 'road': '滨江路', 'version': 1,
+     'stage': '低水位', 'passability': '可通行', 'pump_offline': False,
+     'basis': '最近一次自动采集',
+     'root_cause': '自动采集水位 9cm（低水位，采集时刻 2026-09-28 20:00:00）',
+     'frozen_readings': [], 'active': True, 'superseded_by': None,
+     'trigger': '初始化', 'created_at': '2026-09-28 20:05:00'},
+]
+
+SEED_ROWS["rec_rebuild_task"] = []
+
+# 路段风险看板：河埠路同样停留在旧版可通行，等待空间聚合重算
+SEED_ROWS["road_risk"] = [
+    {'id': 1, '路段': '河埠路', '风险阶段': '中水位', '可通行性': '可通行',
+     '泵站离线数': 0, '受影响设施数': 0, '纳入设施数': 1,
+     '根因摘要': '离线前快照（待重建）', '风险面版本': 1,
+     '更新时间': '2026-09-28 19:05:00'},
+    {'id': 2, '路段': '滨江路', '风险阶段': '低水位', '可通行性': '可通行',
+     '泵站离线数': 0, '受影响设施数': 0, '纳入设施数': 1,
+     '根因摘要': '自动采集水位 9cm（低水位）', '风险面版本': 1,
+     '更新时间': '2026-09-28 20:05:00'},
+]

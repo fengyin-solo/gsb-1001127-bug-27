@@ -4,7 +4,10 @@
 """
 from __future__ import annotations
 
-from typing import Any
+import threading
+from contextlib import contextmanager
+from copy import deepcopy
+from typing import Any, Iterator
 
 from app.seed import SEED_ROWS
 
@@ -14,6 +17,23 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        self._lock = threading.RLock()
+
+    @contextmanager
+    def transaction(self, *tables: str) -> Iterator[None]:
+        """对若干张表提供同事务快照：块内任意一步抛错，全部回滚到进入前状态。
+
+        告警对账台的处置回写要同时落风险面、排水台账、防汛清单和路段看板，
+        必须“要么全成、要么全不成”，所以把事务能力收在仓库这一层。
+        """
+        with self._lock:
+            snapshot = {name: deepcopy(self.rows(name)) for name in tables}
+            try:
+                yield
+            except Exception:
+                for name, rows in snapshot.items():
+                    self._tables[name] = rows
+                raise
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
